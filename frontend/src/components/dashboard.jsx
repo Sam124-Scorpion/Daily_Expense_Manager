@@ -28,7 +28,8 @@ const Dashboard = () => {
 
         const fetchDashboardData = async () => {
             try {
-                const response = await fetch(`http://localhost:8000/api/manage-expense/${userId}/`);
+                const API = import.meta.env.VITE_API_URL;
+                const response = await fetch(`${API}/api/manage-expense/${userId}/`);
                 const data = await response.json().catch(() => ({}));
 
                 if (response.ok) {

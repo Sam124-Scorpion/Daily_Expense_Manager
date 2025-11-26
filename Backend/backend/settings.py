@@ -27,7 +27,9 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*'] # Allow all hosts for development
 
-
+ALLOWED_HOSTS = [
+    "https://daily-expense-manager-1-6fnj.onrender.com"
+]
 # Application definition
 
 INSTALLED_APPS = [
@@ -60,6 +62,10 @@ MIDDLEWARE = [
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True  # Allow all origins for development
+
+CORS_ALLOW_ALL_ORIGINS = [
+    "https://daily-expense-manager-y-git-a007db-soumik-das-projects-94ba204d.vercel.app/"
+]
 
 ROOT_URLCONF = 'backend.urls'
 

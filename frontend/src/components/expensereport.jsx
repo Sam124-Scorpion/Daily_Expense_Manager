@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-const API_BASE_URL = 'http://localhost:8000/api';
+    
+const API = import.meta.env.VITE_API_URL;
+const API_BASE_URL = `${API}/api`;
 
 const ExpenseReport = () => {
     const navigate = useNavigate();
