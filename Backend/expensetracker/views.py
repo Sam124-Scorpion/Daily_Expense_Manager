@@ -133,7 +133,6 @@ def expense_ai_insights(request, user_id):
     if not expenses:
         return JsonResponse({'message': 'No expenses available to analyse'}, status=400)
 
-    # Prepare a lightweight summary for the AI prompt or fallback response
     def to_line(expense):
         date = expense.get('ExpenseDate')
         if date:
@@ -148,8 +147,8 @@ def expense_ai_insights(request, user_id):
         return f"{date_str}: {item} - ₹{cost}"
 
     sample_lines = [to_line(expense) for expense in expenses[:20]]
+    gemini_key = os.environ.get('GEMINI_API_KEY')
 
-    api_key = os.environ.get('GEMINI_API_KEY')
     def build_fallback(provider_hint='fallback'):
         fallback = [
             f"You logged {len(expenses)} expenses recently.",
@@ -163,7 +162,7 @@ def expense_ai_insights(request, user_id):
             'provider': provider_hint
         }, status=200)
 
-    if not api_key:
+    if not gemini_key:
         return build_fallback('no-key')
 
     prompt = (
@@ -174,42 +173,30 @@ def expense_ai_insights(request, user_id):
     )
 
     try:
-        response = requests.post(
-            'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
-            params={'key': api_key},
-            headers={
-                'Content-Type': 'application/json'
-            },
-            json={
-                'contents': [
-                    {
-                        'parts': [
-                            {'text': prompt}
-                        ]
-                    }
-                ]
-            },
-            timeout=20
-        )
-        if response.status_code != 200:
-            # Log a short snippet for debugging but return a friendly fallback to the UI
-            print("Gemini service error:", response.status_code, response.text[:300])
+        import google.generativeai as genai
+        
+        genai.configure(api_key=gemini_key)
+        model = genai.GenerativeModel('gemini-pro')
+        
+        response = model.generate_content(prompt)
+        
+        if response and response.text:
+            ai_text = response.text.strip()
+            return JsonResponse({
+                'insight': ai_text,
+                'provider': 'gemini'
+            }, status=200)
+        else:
+            print("Gemini returned empty response")
             return build_fallback('service-error')
-
-        payload = response.json()
-        candidates = payload.get('candidates') or []
-        if not candidates:
-            return build_fallback('service-error')
-
-        parts = candidates[0].get('content', {}).get('parts') or []
-        if not parts or 'text' not in parts[0]:
-            return build_fallback('service-error')
-
-        ai_text = parts[0]['text'].strip()
+            
+    except ImportError:
+        print("google-generativeai package not installed")
         return JsonResponse({
-            'insight': ai_text,
-            'provider': 'gemini'
-        }, status=200)
+            'message': 'Please install google-generativeai package: pip install google-generativeai',
+            'provider': 'error'
+        }, status=500)
+    except Exception as e:
+        print(f"Gemini error: {e}")
+        return build_fallback('service-error')
 
-    except requests.RequestException:
-        return build_fallback('network-error')

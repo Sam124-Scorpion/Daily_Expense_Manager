@@ -43,8 +43,8 @@ const AddExpense = () => {
                 navigate('/login');
                 return;
             }
-            const API = import.meta.env.VITE_API_URL;
-            const response = await fetch(`${API}/api/add-expense/`, {
+
+            const response = await fetch('http://localhost:8000/api/add-expense/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
