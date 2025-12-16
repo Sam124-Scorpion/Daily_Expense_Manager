@@ -1,5 +1,6 @@
 import json
 import os
+from collections import Counter
 from django.shortcuts import render
 from django.http import HttpResponse , JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -114,15 +115,11 @@ def expense_detail(request, expense_id):
 
     return JsonResponse({'message': 'Invalid request method'}, status=405)
 
+
 @csrf_exempt
 def expense_ai_insights(request, user_id):
     if request.method != 'POST':
         return JsonResponse({'message': 'Invalid request method'}, status=405)
-
-    try:
-        user = UserDetails.objects.get(id=user_id)
-    except UserDetails.DoesNotExist:
-        return JsonResponse({'message': 'User not found'}, status=404)
 
     expenses = list(
         ExpenseDetails.objects.filter(User_id=user_id)
@@ -131,72 +128,177 @@ def expense_ai_insights(request, user_id):
     )
 
     if not expenses:
-        return JsonResponse({'message': 'No expenses available to analyse'}, status=400)
+        return JsonResponse({'message': 'No expenses found for user', 'provider': 'none'}, status=404)
 
-    def to_line(expense):
-        date = expense.get('ExpenseDate')
-        if date:
+    total_expenses = sum(float(e.get('ExpenseCost') or 0) for e in expenses)
+    avg_expense = total_expenses / len(expenses) if expenses else 0
+
+    def generate_fallback_insights():
+        costs = [float(e.get('ExpenseCost') or 0) for e in expenses if e.get('ExpenseCost') is not None]
+        items = [(e.get('ExpenseItem') or 'Other').strip() or 'Other' for e in expenses]
+        item_totals = {}
+        for e in expenses:
+            key = (e.get('ExpenseItem') or 'Other').strip() or 'Other'
             try:
-                date_str = timezone.localtime(date).strftime('%Y-%m-%d')
+                item_totals[key] = item_totals.get(key, 0) + float(e.get('ExpenseCost') or 0)
             except Exception:
-                date_str = str(date)
-        else:
-            date_str = 'Unknown date'
-        item = expense.get('ExpenseItem') or 'Unknown item'
-        cost = expense.get('ExpenseCost') or 0
-        return f"{date_str}: {item} - ₹{cost}"
+                pass
 
-    sample_lines = [to_line(expense) for expense in expenses[:20]]
-    gemini_key = os.environ.get('GEMINI_API_KEY')
+        top_items = sorted(item_totals.items(), key=lambda kv: kv[1], reverse=True)[:3]
+        frequent_items = Counter(items).most_common(2)
+        small_spends = [c for c in costs if c < (avg_expense * 0.5 if avg_expense else 0)]
 
-    def build_fallback(provider_hint='fallback'):
-        fallback = [
-            f"You logged {len(expenses)} expenses recently.",
-            f"Sample entry: {sample_lines[0]}" if sample_lines else "Add more entries to see patterns.",
-            "Review recurring costs and set a budget alert for top categories.",
-            "Configure a Gemini API key to unlock AI-authored insights." if provider_hint == 'no-key'
-            else "We will keep trying to reach the AI service; please retry shortly."
+        lines = []
+        if top_items:
+            parts = [f"{name}: ₹{amt:,.0f}" for name, amt in top_items]
+            lines.append(f"Top spend categories -> {', '.join(parts)}.")
+        if frequent_items:
+            freq = [f"{name} x{cnt}" for name, cnt in frequent_items]
+            lines.append(f"Most frequent items -> {', '.join(freq)}.")
+        if small_spends and len(small_spends) >= 3:
+            lines.append("Many small purchases detected; try batching or weekly caps.")
+        if avg_expense:
+            lines.append(f"Average per expense: ₹{avg_expense:,.0f}. Set a per-purchase limit to stay on budget.")
+        lines.append("Pick one top category and aim to trim 10-15% this month.")
+
+        return "\n".join(f"- {line}" for line in lines) if lines else "- Keep tracking; not enough data for insights yet."
+
+    def build_prompt():
+        summary_lines = [
+            f"Total expenses: ₹{total_expenses:,.2f}",
+            f"Average per expense: ₹{avg_expense:,.2f}",
+            f"Expense count: {len(expenses)}",
         ]
-        return JsonResponse({
-            'insight': '\n'.join(fallback),
-            'provider': provider_hint
-        }, status=200)
+        top_counts = Counter((e.get('ExpenseItem') or 'Other').strip() or 'Other' for e in expenses).most_common(5)
+        if top_counts:
+            summary_lines.append(
+                "Top items: " + ", ".join([f"{name} x{cnt}" for name, cnt in top_counts])
+            )
+        details = "\n".join(
+            [f"- {e.get('ExpenseItem') or 'Item'} | ₹{float(e.get('ExpenseCost') or 0):.2f}" for e in expenses[:30]]
+        )
+        prompt = (
+            "You are a concise financial coach."
+            " Give 3-5 bullet insights and 2 actionable suggestions tailored to the data."
+            " Avoid repeating the raw numbers; focus on patterns and next steps."
+            " Keep it under 120 words."
+            f"\nSummary:\n{os.linesep.join(summary_lines)}\nDetails:\n{details}"
+        )
+        return prompt
 
-    if not gemini_key:
-        return build_fallback('no-key')
+    def call_gemini(prompt_text):
+        api_key = os.environ.get('GEMINI_API_KEY')
+        if not api_key:
+            return None, 'GEMINI_API_KEY not configured'
 
-    prompt = (
-        "You are a concise financial coach. The following are recent expenses:\n"
-        f"{chr(10).join(sample_lines)}\n\n"
-        "Provide four short bullet insights in second person, highlighting spending patterns, "
-        "potential savings, and encouragement. Keep it under 120 words."
-    )
+        # Allow overriding the Gemini model via env; default to requested 2.5 Flash
+        model = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        params = {'key': api_key}
+        payload = {
+            "contents": [
+                {"parts": [{"text": prompt_text}]}
+            ]
+        }
 
-    try:
-        import google.generativeai as genai
-        
-        genai.configure(api_key=gemini_key)
-        model = genai.GenerativeModel('gemini-pro')
-        
-        response = model.generate_content(prompt)
-        
-        if response and response.text:
-            ai_text = response.text.strip()
+        response = requests.post(url, params=params, json=payload, timeout=30)
+        if response.status_code == 429:
+            return 'quota', 'Gemini quota exceeded'
+        if not response.ok:
+            return None, f"Gemini API error: {response.status_code} {response.text}"
+        data = response.json()
+        try:
+            text = data['candidates'][0]['content']['parts'][0]['text']
+            return text.strip(), None
+        except Exception as exc:  # keep narrow surface
+            return None, f"Gemini response parse error: {exc}"
+
+    def call_openai(prompt_text):
+        api_key = os.environ.get('OPENAI_API_KEY')
+        if not api_key:
+            return None, 'OPENAI_API_KEY not configured'
+        try:
+            from openai import OpenAI
+        except ImportError:
+            return None, 'OpenAI package not installed'
+
+        try:
+            client = OpenAI(api_key=api_key)
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are a concise financial coach for personal expenses."},
+                    {"role": "user", "content": prompt_text},
+                ],
+                max_tokens=300,
+                temperature=0.6,
+            )
+            if response.choices and response.choices[0].message.content:
+                return response.choices[0].message.content.strip(), None
+            return None, 'OpenAI returned empty response'
+        except Exception as exc:
+            status_code = (
+                getattr(getattr(exc, 'response', None), 'status_code', None)
+                or getattr(exc, 'status_code', None)
+                or getattr(exc, 'http_status', None)
+            )
+            if status_code == 429 or 'insufficient_quota' in str(exc).lower():
+                return 'quota', 'OpenAI quota exceeded'
+            return None, f"OpenAI API error: {exc}"
+
+    provider = (request.GET.get('provider') or 'gemini').lower()
+    prompt = build_prompt()
+
+    if provider == 'gemini':
+        insight, err = call_gemini(prompt)
+        if insight == 'quota':
+            insight = generate_fallback_insights()
             return JsonResponse({
-                'insight': ai_text,
-                'provider': 'gemini'
+                'insight': insight,
+                'provider': 'fallback',
+                'note': 'Gemini quota exceeded; showing local insights.',
+                'total_expenses': total_expenses,
+                'average_expense': avg_expense,
+                'expense_count': len(expenses)
             }, status=200)
-        else:
-            print("Gemini returned empty response")
-            return build_fallback('service-error')
-            
-    except ImportError:
-        print("google-generativeai package not installed")
-        return JsonResponse({
-            'message': 'Please install google-generativeai package: pip install google-generativeai',
-            'provider': 'error'
-        }, status=500)
-    except Exception as e:
-        print(f"Gemini error: {e}")
-        return build_fallback('service-error')
+        if insight:
+            return JsonResponse({
+                'insight': insight,
+                'provider': 'gemini',
+                'total_expenses': total_expenses,
+                'average_expense': avg_expense,
+                'expense_count': len(expenses)
+            }, status=200)
+
+    if provider == 'openai':
+        insight, err = call_openai(prompt)
+        if insight == 'quota':
+            insight = generate_fallback_insights()
+            return JsonResponse({
+                'insight': insight,
+                'provider': 'fallback',
+                'note': 'OpenAI quota exceeded; showing local insights.',
+                'total_expenses': total_expenses,
+                'average_expense': avg_expense,
+                'expense_count': len(expenses)
+            }, status=200)
+        if insight:
+            return JsonResponse({
+                'insight': insight,
+                'provider': 'openai',
+                'total_expenses': total_expenses,
+                'average_expense': avg_expense,
+                'expense_count': len(expenses)
+            }, status=200)
+
+    # If provider missing or errors, return fallback insights
+    return JsonResponse({
+        'insight': generate_fallback_insights(),
+        'provider': 'fallback',
+        'note': err if 'err' in locals() else 'Using local fallback insights.',
+        'total_expenses': total_expenses,
+        'average_expense': avg_expense,
+        'expense_count': len(expenses)
+    }, status=200)
+
 
