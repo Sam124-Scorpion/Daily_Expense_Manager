@@ -184,7 +184,7 @@ const ManageExpense = () => {
     };
 
     return (
-        <div className='container py-4 w-full flex items-center justify-center' style={{marginTop :'5rem' , height : 'auto'}}>
+        <div className='container py-4 w-full flex items-center justify-center' style={{ marginTop: '5rem', height: 'auto' }}>
             <div className='d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-4'>
                 <div>
                     <h2 className='fw-bold mb-1'><i className='fas fa-tasks me-2'></i>Manage Expenses</h2>
@@ -259,7 +259,7 @@ const ManageExpense = () => {
             </div>
             <ToastContainer position="bottom-center" />
             <title>Manage Expenses - Expense Tracker</title>
-        <meta name="description" content="Manage Expenses - Expense Tracker" />
+            <meta name="description" content="Manage Expenses - Expense Tracker" />
         </div>
     )
 }

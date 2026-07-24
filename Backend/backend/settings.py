@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-5x!d@vgwu0zgvt5kp63!u8^fxp!7i&x2b3(ojdz!5phlsf^g%6
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*'] # Allow all hosts for development
+ALLOWED_HOSTS = ['*' , '.vercel.app'] # Allow all hosts for development
 
 
 # Application definition
@@ -87,12 +87,41 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+import os
+import urllib.parse
+
+if os.environ.get('DATABASE_URL'):
+    # Parse the database URL from the environment variable
+    database_url = os.environ['DATABASE_URL']
+    parsed_url = urllib.parse.urlparse(database_url)
+
+    # Extract the database connection parameters
+    db_engine = 'django.db.backends.postgresql'  # Assuming PostgreSQL, adjust if needed
+    db_name = parsed_url.path[1:]  # Remove leading '/'
+    db_user = parsed_url.username
+    db_password = parsed_url.password
+    db_host = parsed_url.hostname
+    db_port = parsed_url.port
+
+    DATABASES = {
+        'default': {
+            'ENGINE': db_engine,
+            'NAME': db_name,
+            'USER': db_user,
+            'PASSWORD': db_password,
+            'HOST': db_host,
+            'PORT': db_port,
+        }
     }
-}
+else:
+    # Default to SQLite if DATABASE_URL is not set
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
+
 
 import os
 from dotenv import load_dotenv
