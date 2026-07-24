@@ -87,35 +87,8 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-import os
-import urllib.parse
 
-if os.environ.get('DATABASE_URL'):
-    # Parse the database URL from the environment variable
-    database_url = os.environ['DATABASE_URL']
-    parsed_url = urllib.parse.urlparse(database_url)
-
-    # Extract the database connection parameters
-    db_engine = 'django.db.backends.postgresql'  # Assuming PostgreSQL, adjust if needed
-    db_name = parsed_url.path[1:]  # Remove leading '/'
-    db_user = parsed_url.username
-    db_password = parsed_url.password
-    db_host = parsed_url.hostname
-    db_port = parsed_url.port
-
-    DATABASES = {
-        'default': {
-            'ENGINE': db_engine,
-            'NAME': db_name,
-            'USER': db_user,
-            'PASSWORD': db_password,
-            'HOST': db_host,
-            'PORT': db_port,
-        }
-    }
-else:
-    # Default to SQLite if DATABASE_URL is not set
-    DATABASES = {
+DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
@@ -165,6 +138,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = 'static/'
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
