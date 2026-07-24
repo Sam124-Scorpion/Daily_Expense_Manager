@@ -14,6 +14,17 @@ const signup = () => {
         Password: ''
     });
 
+    const getErrorMessage = async (response) => {
+        const text = await response.text();
+
+        try {
+            const parsed = JSON.parse(text);
+            return parsed.message || parsed.error || 'Signup failed';
+        } catch {
+            return text || `Signup failed with status ${response.status}`;
+        }
+    };
+
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData({
@@ -41,13 +52,13 @@ const signup = () => {
                 }, 2000);
 
             } else {
-                // Handle signup error
-                const errorData = await response.json();
-                toast.error(`Signup failed: ${errorData.message}`);
-                console.error('Signup error:', errorData);
+                const errorMessage = await getErrorMessage(response);
+                toast.error(`Signup failed: ${errorMessage}`);
+                console.error('Signup error:', errorMessage);
             }
         }
         catch (error) {
+            toast.error('Signup failed. Please check the API endpoint and try again.');
             console.error('Error during signup:', error);
         }
     };

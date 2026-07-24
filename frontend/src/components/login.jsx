@@ -11,6 +11,17 @@ const login = () => {
         Password: ''
     });
 
+    const getErrorMessage = async (response) => {
+        const text = await response.text();
+
+        try {
+            const parsed = JSON.parse(text);
+            return parsed.message || parsed.error || 'Login failed';
+        } catch {
+            return text || `Login failed with status ${response.status}`;
+        }
+    };
+
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData({
@@ -22,7 +33,6 @@ const login = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            
             const response = await fetch(`${API_BASE_URL}/login/`, {
                 method: 'POST',
                 headers: {
@@ -30,8 +40,9 @@ const login = () => {
                 },
                 body: JSON.stringify(formData),
             });
-            const data = await response.json();
+
             if (response.status === 201) {
+                const data = await response.json();
                 // Handle successful signup
                 toast.success('Login successful! Redirecting to home page.');
                 localStorage.setItem('userId', data.userId);
@@ -43,13 +54,13 @@ const login = () => {
                 }, 2000);
 
             } else {
-                // Handle signup error
-                const errorData = await response.json();
-                toast.error(`Login failed: ${errorData.message}`);
-                console.error('Login error:', errorData);
+                const errorMessage = await getErrorMessage(response);
+                toast.error(`Login failed: ${errorMessage}`);
+                console.error('Login error:', errorMessage);
             }
         }
         catch (error) {
+            toast.error('Login failed. Please check the API endpoint and try again.');
             console.error('Error during login:', error);
         }
     };
