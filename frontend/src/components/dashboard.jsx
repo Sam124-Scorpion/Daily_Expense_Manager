@@ -9,6 +9,7 @@ import {
     Legend,
 } from 'chart.js';
 import { Pie } from 'react-chartjs-2';
+import { API_BASE_URL } from '../config/api';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -28,7 +29,7 @@ const Dashboard = () => {
 
         const fetchDashboardData = async () => {
             try {
-                const response = await fetch(`http://localhost:8000/api/manage-expense/${userId}/`);
+                const response = await fetch(`${API_BASE_URL}/manage-expense/${userId}/`);
                 const data = await response.json().catch(() => ({}));
 
                 if (response.ok) {

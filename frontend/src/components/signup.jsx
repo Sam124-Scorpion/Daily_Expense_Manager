@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { toast, ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { useNavigate } from 'react-router-dom'
+import { API_BASE_URL } from '../config/api'
 
 
 const signup = () => {
@@ -24,7 +25,7 @@ const signup = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const response = await fetch('http://localhost:8000/api/signup/', {
+            const response = await fetch(`${API_BASE_URL}/signup/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

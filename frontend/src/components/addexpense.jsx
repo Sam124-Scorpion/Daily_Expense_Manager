@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { toast, ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { useNavigate } from 'react-router-dom'
+import { API_BASE_URL } from '../config/api'
 
 const AddExpense = () => {
 
@@ -44,7 +45,7 @@ const AddExpense = () => {
                 return;
             }
 
-            const response = await fetch('http://localhost:8000/api/add-expense/', {
+            const response = await fetch(`${API_BASE_URL}/add-expense/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

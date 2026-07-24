@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './AIInsights.css';
+import { API_BASE_URL } from '../config/api';
 
 const AIInsights = ({ userId }) => {
     const [insights, setInsights] = useState(null);
@@ -12,7 +13,7 @@ const AIInsights = ({ userId }) => {
         
         try {
             const response = await fetch(
-                `http://localhost:8000/api/ai/insights/${userId}/`,
+                `${API_BASE_URL}/ai/insights/${userId}/`,
                 {
                     method: 'POST',
                     headers: {

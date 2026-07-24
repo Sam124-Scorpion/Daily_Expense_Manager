@@ -2,6 +2,7 @@ import React , {useState} from 'react'
 import { toast, ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { useNavigate } from 'react-router-dom'
+import { API_BASE_URL } from '../config/api'
 
 const login = () => {
     const navigate = useNavigate();
@@ -22,7 +23,7 @@ const login = () => {
         e.preventDefault();
         try {
             
-            const response = await fetch('http://localhost:8000/api/login/', {
+            const response = await fetch(`${API_BASE_URL}/login/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
