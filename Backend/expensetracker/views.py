@@ -7,7 +7,13 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils import timezone
 import requests
 from . models import UserDetails , ExpenseDetails
+
+
+
 # Create your views here.
+@csrf_exempt
+def home(request):
+    return render(request, 'home.html')
 
 @csrf_exempt
 def signup(request):
