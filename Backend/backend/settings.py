@@ -33,15 +33,6 @@ SECRET_KEY = os.environ.get(
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() == 'true'
 
-ALLOWED_HOSTS = [host.strip() for host in os.environ.get(
-    'ALLOWED_HOSTS',
-    '.vercel.app,localhost,127.0.0.1',
-).split(',') if host.strip()]
-
-CSRF_TRUSTED_ORIGINS = ['https://*.vercel.app']
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-
-
 
 # Application definition
 
@@ -115,35 +106,12 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-IS_VERCEL = bool(os.environ.get('VERCEL') or os.environ.get('VERCEL_URL'))
-DATABASE_URL = (
-    os.environ.get('DATABASE_URL')
-    or os.environ.get('POSTGRES_URL_NON_POOLING')
-    or os.environ.get('POSTGRES_URL')
-    or os.environ.get('POSTGRES_PRISMA_URL')
-)
-USE_EXTERNAL_DATABASE = (
-    os.environ.get('DJANGO_USE_DATABASE_URL', '').lower() == 'true'
-    or IS_VERCEL
-)
-
-if DATABASE_URL and USE_EXTERNAL_DATABASE:
-    DATABASES = {
-        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600),
-    }
-elif IS_VERCEL:
-    raise RuntimeError(
-        'A hosted database is required on Vercel. Set DATABASE_URL (or POSTGRES_URL) '
-        'in the Vercel project environment variables.'
+DATABASES = {
+    'default': dj_database_url.config(
+        default=os.environ.get('DATABASE_URL', 'sqlite:///' + str(BASE_DIR / 'db.sqlite3')),
+        conn_max_age=600,
     )
-else:
-    # Local development fallback: SQLite file inside the repo.
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
+}
 
 DJANGO_READ_DOT_ENV_FILE = True
 
