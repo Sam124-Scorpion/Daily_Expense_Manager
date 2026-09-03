@@ -115,19 +115,29 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASE_URL = os.environ.get('DATABASE_URL')
-
+IS_VERCEL = bool(os.environ.get('VERCEL') or os.environ.get('VERCEL_URL'))
+DATABASE_URL = (
+    os.environ.get('DATABASE_URL')
+    or os.environ.get('POSTGRES_URL_NON_POOLING')
+    or os.environ.get('POSTGRES_URL')
+    or os.environ.get('POSTGRES_PRISMA_URL')
+)
 USE_EXTERNAL_DATABASE = (
-    os.environ.get('VERCEL') == '1'
-    or os.environ.get('DJANGO_USE_DATABASE_URL', '').lower() == 'true'
+    os.environ.get('DJANGO_USE_DATABASE_URL', '').lower() == 'true'
+    or IS_VERCEL
 )
 
 if DATABASE_URL and USE_EXTERNAL_DATABASE:
     DATABASES = {
         'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600),
     }
+elif IS_VERCEL:
+    raise RuntimeError(
+        'A hosted database is required on Vercel. Set DATABASE_URL (or POSTGRES_URL) '
+        'in the Vercel project environment variables.'
+    )
 else:
-    # Default to SQLite for local development only.
+    # Local development fallback: SQLite file inside the repo.
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
